@@ -153,28 +153,56 @@ const lista = await gmail.users.messages.list({
 	
 	q:"subject: You've Made A AND is:unread"
 });
+array_objs=[];
+temp_obj = [];
 message_id = lista.data.messages;
+final_array = [];
 for (const messages in message_id){
 	const msg = await gmail.users.messages.get({userId: 'me',id: message_id[messages].id});
 	final_array = [];
      	message_encoded = msg.data.payload.parts[1].body.data;
 	message_decoded = Buffer.from(message_encoded, 'base64').toString('ascii');
 	first_split = message_decoded.lastIndexOf('<td style="padding-left: 8px;">');
+	
 	while (first_split != -1){
 		hld_str = message_decoded.substring(first_split);
 		sec_split = hld_str.indexOf("</td>");
 		final_res = hld_str.substring(0,sec_split+6);
 		array_la = final_res.split("\n");
 		affix_flag = "Title: ";
-		array_la [1] = affix_flag.concat(array_la[1]);
-		final_array.push(final_array,array_la);
+		array_la[1] = affix_flag.concat(array_la[1].trimStart());
+		final_array.push.apply(final_array,array_la);
 		message_decoded = message_decoded.replace(final_res,"");
-		first_split = message_decoded.lastIndexOf('<td style="padding-left: 8px;">');
-
-		
+		first_split = message_decoded.lastIndexOf('<td style="padding-left: 8px;">');	
 	}
-console.log(final_array);
+for (i in final_array){
+	proc_string = final_array[i];
+	        if (proc_string.includes("Size") || proc_string.includes("Your")|| proc_string.includes("Title:")){
+           		proc_string = proc_string.replace( /(?<=\d\))|<[^>]*>/g,"");
+			proc_string = proc_string.replace(/:[^()]*\(/g,": ");
+                        proc_string = proc_string.replace("\r","");
+			proc_string = proc_string.replace(")","");
+                        proc_string = proc_string.replace("US$","");         
+
+if(proc_string.includes("Title:")){     
+   proc_string  =proc_string.replace(/^[^:]*:/,"");
+   lalal = proc_string.indexOf("of");
+   redd = proc_string.substring(0,lalal);
+   temp_obj.push(proc_string.substring(lalal+3));
+   vicki = redd.split("x");
+   temp_obj.push.apply(temp_obj,vicki);
 }
+else{
+proc_string  =proc_string.replace(/^[^:]*:/,"");
+temp_obj.push(proc_string.trimStart().trimEnd().replace("</p>",""));}
+}
+}
+objecct = new prod_inf(temp_obj);
+array_obj.push(objecct);
+console.log(objecct.name);
+temp_obj = [];
+}
+
 }
 authorize().then(listmessages).catch(console.error);
 
