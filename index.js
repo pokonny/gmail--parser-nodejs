@@ -1,5 +1,4 @@
-const fs = require('fs').promises
-const prod_inf = require('./prod_inf')
+const fs = require('fs').promise
 const path = require('path')
 const express = require('express')
 const db = require('./queries')
@@ -8,8 +7,6 @@ const port = 3001
 const bodyParser = require('body-parser')
 const array_obj = []
 
-
-app.use(express.json())
 
 app.use(function (req, res, next) {
 
@@ -28,8 +25,6 @@ const process = require('process')
 const {authenticate} = require('@google-cloud/local-auth')
 
 const {google} = require('googleapis')
-
-// If modifying these scopes, delete token.json.
 
 const SCOPES = ['https://mail.google.com/'];
 
@@ -185,7 +180,10 @@ const gmail = google.gmail({version: 'v1', auth});
 
 
 
+/*Method opens all emails matching the query requirements. Scraps the necessary data from each email 
+then inputs it into  the postgres sql database.
 
+*/
 async function listmessages(auth){
 const gmail = google.gmail({version: 'v1', auth});
 /*** Grabs all emails and then stores the ids in message_id**/
@@ -196,24 +194,44 @@ const lista = await gmail.users.messages.list({
 	
 	q:"subject: You've Made A AND is:unread",
 });
-ii =0;
+
+
+/*Contains the raw data from the email */
 message_id = lista.data.messages;
 final_array = [];
 date_rec = "";
+
+
+/*Loops through each email using message_id to grab the specific message*/
 for (const messages in message_id){
 final_array = [];
 	const msg = await gmail.users.messages.get(
 {userId: 'me',
 id: message_id[messages].id
 });
+/*Decodes the message from base64 to ascii*/
+
     	message_encoded = msg.data.payload.parts[1].body.data;
 	message_decoded = Buffer.from(message_encoded, 'base64').toString('ascii');
-	gravv = msg.data.payload["headers"];
-	for(item in gravv){
-	if (gravv[item]["name"]=="Date"){
-		date_rec = gravv[item]["value"].substring(5,16);
+	
+/*Grabs the date the email arrived. For some reason the date is one day ahead from the actual arrival.
+ Will fix later.*/
+	grab_date = msg.data.payload["headers"];
+	for(item in grab_date){
+	if (grab_date[item]["name"]=="Date"){
+		date_rec = grab_date[item]["value"].substring(5,16);
 }
 }
+
+/*
+Splits the email along the var first_split to obtain the necessary data. 
+Finds index </td> to determine where the data ends
+Split's the snipped data along delimeter "\n" into  an array
+Affix flag to first line to make later processing easier
+Pushes final processed string into final_array then deletes the snippet from the original message_decoded
+Loops through email til first_split =-1
+*/
+
  first_split = message_decoded.lastIndexOf('<td style="padding-left: 8px;">');
 
 
@@ -238,8 +256,7 @@ id: message_id[messages].id
                 first_split = message_decoded.lastIndexOf('<td style="padding-left: 8px;">');   
 
 }   
-
-   a = final_array.length;
+/*Final_array is a double array. The below loop removes the html tags from the data then pushes it into the database*/
 
         for(let i = 0; i < final_array.length; i++){
 
@@ -276,7 +293,7 @@ id: message_id[messages].id
 
 	                        else{
 
-                        	 	proc_string  =proc_string.replace(/^[^:]*:/,"");
+                        	 	proc_string  = proc_string.replace(/^[^:]*:/,"");
 			
                        		 	proc_string = proc_string.replace("%","");
 
@@ -312,15 +329,42 @@ db.add_it(final_array);
 }
 
 authorize().then(listmessages).catch(console.error);
-app.get('/', (request, response) => {
 
-  response.json({ info: 'Node.js, Express, and Postgres API' })
+
+/*Deploys the application to the react front-end*/
+app.use(express.json())
+
+app.use(function (req, res, next) {
+
+  res.setHeader('Access-Control-Allow-Origin', 'http://localhost:5173');
+
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Access-Control-Allow-Headers');
+
+  next();
 
 });
 
-app.get('/records', db.getRecords);
+
+app.get('/', (req, res) => {
+
+  db.getRecords()
+
+  .then(response => {
+
+    res.status(200).send(response);
+
+  })
+
+  .catch(error => {
+
+    res.status(500).send(error);
+
+  })
+})
 app.listen(port, () => {
 
   console.log(`App running on port ${port}.`)
 
-});
+})
